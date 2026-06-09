@@ -1,9 +1,8 @@
 import re
 import requests
 
-""" Archivo para parsear los releases de TensorFlow y extraer
-la información relevante sobre los cambios, incluyendo el 
-módulo específico asociado a cada cambio. """
+""" Parses TensorFlow releases and extracts relevant change information,
+including the specific module associated with each change. """
 
 url = "https://api.github.com/repos/tensorflow/tensorflow/releases"
 response = requests.get(url)
@@ -14,48 +13,48 @@ def parse_release(release: dict) -> dict:
     body = release['body']
     changes = []
 
-    # Secciones a extraer
+    # Sections to extract
     breaking_section = extract_section(body, r'### Breaking Changes')
     features_section = extract_section(body, r'### Major Features and Improvements')
     bugfixes_section = extract_section(body, r'### Bug Fixes and Other Changes')
 
-    # Procesar breaking changes
+    # Process breaking changes
     for item in extract_items_with_module(breaking_section):
         changes.append({'type': 'breaking', 'module': item['module'], 'description': item['description'], 'fix': ''})
 
-    # Procesar features
+    # Process features
     for item in extract_items_with_module(features_section):
         changes.append({'type': 'feature', 'module': item['module'], 'description': item['description'], 'fix': ''})
 
-    # Procesar bug fixes
+    # Process bug fixes
     for item in extract_items_with_module(bugfixes_section):
         changes.append({'type': 'bugfix', 'module': item['module'], 'description': item['description'], 'fix': ''})
 
     return {'version': version, 'changes': changes}
 
 def extract_section(body: str, section_pattern: str) -> str:
-    """Extrae el contenido de una sección específica."""
+    """Extracts the content of a specific section."""
     match = re.search(section_pattern + r'(.*?)(?=^##|\Z)', body, re.MULTILINE | re.DOTALL)
     return match.group(1) if match else ""
 
 def extract_items_with_module(section: str) -> list:
-    """Extrae los items con su módulo asociado (e.g., tf.lite)."""
+    """Extracts items with their associated module (e.g., tf.lite)."""
     items = []
     lines = section.split('\n')
     current_module = ""
 
     for line in lines:
-        # Detectar si es un bullet de primer nivel (módulo)
+        # Detect top-level bullet (module)
         if line.startswith('* ') and '`' in line:
             match = re.search(r'`([^`]+)`', line)
             if match:
                 current_module = match.group(1)
-        # Detectar si es un sub-bullet (item del módulo)
+        # Detect sub-bullet (item under a module)
         elif line.startswith('    * '):
             description = line[6:].strip().replace('\xa0', ' ')
             if description:
                 items.append({'module': current_module, 'description': description})
-        # Detectar bullet sin módulo (breaking changes sin sub-items)
+        # Detect bullet without module (breaking changes with no sub-items)
         elif line.startswith('* ') and '`' not in line:
             description = line[2:].strip().replace('\xa0', ' ')
             if description:

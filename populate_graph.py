@@ -2,70 +2,67 @@ from rdflib import Graph, URIRef, RDF, RDFS, OWL, Namespace, Literal
 from rdflib.namespace import XSD
 import hashlib
 
-# definer namespace
+# define namespace
 EX = Namespace("http://example.org/ontology#")
 
-# crear grafo
+# create graph
 g = Graph()
 g.bind("ex", EX)
 
 def populate_graph(parsed_release: dict, graph: Graph, library_uri=None) -> None:
     """
-    Pobla el grafo RDF con la información de una release.
+    Populates the RDF graph with data from a parsed release.
 
     Args:
-        parsed_release: Dict con 'version' y 'changes'
-        graph: Grafo RDF donde agregar los datos
-        library_uri: URI de la librería padre (para vincular versiones)
+        parsed_release: Dict with 'version' and 'changes'
+        graph: RDF graph to add data to
+        library_uri: URI of the parent library (to link versions)
     """
     version_number = parsed_release['version']
 
-    # Crear instancia de Version
+    # Create Version instance
     version_uri = EX[f"Version_{version_number.replace('.', '_')}"]
     graph.add((version_uri, RDF.type, EX.Version))
     graph.add((version_uri, EX.versionNumber, Literal(version_number, datatype=XSD.string)))
 
-    # Vincular version a la librería si existe
+    # Link version to library if provided
     if library_uri:
         graph.add((library_uri, EX.hasVersion, version_uri))
 
-    # Procesar cada change
+    # Process each change
     for change in parsed_release['changes']:
         description = change['description'].strip()
 
-        # Filtrar descriptions de mala calidad (headers markdown)
+        # Skip low-quality descriptions (markdown headers)
         if not description or description.endswith(':') or len(description) < 10:
             continue
 
-        # Crear URI única para el change usando MD5 del description
+        # Create unique URI for the change using MD5 of the description
         change_hash = hashlib.md5(description.encode()).hexdigest()[:8]
         change_uri = EX[f"Change_{version_number.replace('.', '_')}_{change_hash}"]
 
-        # Crear instancia de Change
+        # Create Change instance
         graph.add((change_uri, RDF.type, EX.Change))
         graph.add((change_uri, EX.typeChange, Literal(change['type'], datatype=XSD.string)))
         graph.add((change_uri, EX.descriptionChange, Literal(description, datatype=XSD.string)))
         graph.add((change_uri, EX.fixChange, Literal(change['fix'], datatype=XSD.string)))
 
-        # Vincular change a version
+        # Link change to version
         graph.add((version_uri, EX.hasChange, change_uri))
 
-        # Procesar módulo si existe
+        # Process module if present
         if change['module']:
             module_name = change['module'].replace('.', '_')
             module_uri = EX[f"Module_{module_name}"]
 
-            # Verificar si el módulo ya existe en el grafo
-            module_exists = (module_uri, RDF.type, EX.Module) in graph
-
-            # Si no existe, crear la instancia
-            if not module_exists:
+            # Create module instance if it doesn't exist
+            if (module_uri, RDF.type, EX.Module) not in graph:
                 graph.add((module_uri, RDF.type, EX.Module))
 
-            # Vincular change a module
+            # Link change to module
             graph.add((change_uri, EX.changeModule, module_uri))
 
-# definer clases
+# define classes
 g.add((EX.Library, RDF.type, OWL.Class))
 g.add((EX.Library, RDFS.label, Literal("Library")))
 
@@ -84,7 +81,7 @@ g.add((EX.Change, RDFS.label, Literal("Change")))
 g.add((EX.Language, RDF.type, OWL.Class))
 g.add((EX.Language, RDFS.label, Literal("Language")))
 
-#Anadir relaciones
+# Add relationships
 g.add((EX.hasVersion, RDF.type, OWL.ObjectProperty))
 g.add((EX.hasVersion, RDFS.domain, EX.Library))
 g.add((EX.hasVersion, RDFS.range, EX.Version))
@@ -103,9 +100,9 @@ g.add((EX.requires, RDFS.range, EX.Language))
 
 g.add((EX.changeModule, RDF.type, OWL.ObjectProperty))
 g.add((EX.changeModule, RDFS.domain, EX.Change))
-g.add((EX.changeModule, RDFS.range, EX.Module)) #change afecta a un módulo específico
+g.add((EX.changeModule, RDFS.range, EX.Module))
 
-#Anadir atributos
+# Add attributes
 g.add((EX.versionNumber, RDF.type, OWL.DatatypeProperty))
 g.add((EX.versionNumber, RDFS.domain, EX.Version))
 g.add((EX.versionNumber, RDFS.range, XSD.string))
@@ -126,13 +123,13 @@ g.add((EX.fixChange, RDF.type, OWL.DatatypeProperty))
 g.add((EX.fixChange, RDFS.domain, EX.Change))
 g.add((EX.fixChange, RDFS.range, XSD.string))
 
-# crear instancia ejemplo
-# Crear una instancia de TensorFlow
+# Create example instances (will be cleaned up below)
+# Create a TensorFlow instance
 library1 = EX.TensorFlow
 g.add((library1, RDF.type, EX.Library))
 g.add((library1, EX.libraryName, Literal("TensorFlow", datatype=XSD.string)))
 
-# Crear las instancias de las Versiones
+# Create Version instances
 version1 = EX.Version_2_1_0
 g.add((version1, RDF.type, EX.Version))
 g.add((version1, EX.versionNumber, Literal("2.1.0", datatype=XSD.string)))
@@ -143,28 +140,28 @@ g.add((version2, RDF.type, EX.Version))
 g.add((version2, EX.versionNumber, Literal("2.1.3", datatype=XSD.string)))
 g.add((library1, EX.hasVersion, version2))
 
-# Crear una instancia de Change
+# Create a Change instance
 change1 = EX.Change_v_2_1_3
 g.add((change1, RDF.type, EX.Change))
 g.add((change1, EX.typeChange, Literal("breaking", datatype=XSD.string)))
-g.add((change1, EX.descriptionChange, Literal("Se eliminó la función tf.contrib.layers.batch_norm", datatype=XSD.string)))
-g.add((change1, EX.fixChange, Literal("Reemplazar tf.contrib.layers.batch_norm por tf.keras.layers.BatchNormalization", datatype=XSD.string)))
+g.add((change1, EX.descriptionChange, Literal("Removed tf.contrib.layers.batch_norm function", datatype=XSD.string)))
+g.add((change1, EX.fixChange, Literal("Replace tf.contrib.layers.batch_norm with tf.keras.layers.BatchNormalization", datatype=XSD.string)))
 g.add((version2, EX.hasChange, change1))
 
-# Crear una instancia de Module
+# Create a Module instance
 module1 = EX.Module_keras_optimizers
 g.add((module1, RDF.type, EX.Module))
 g.add((library1, EX.hasModule, module1))
 
-# Asociar el cambio al módulo específico
+# Link change to module
 g.add((change1, EX.changeModule, module1))  
 
-# Crear una instancia de Language
+# Create a Language instance
 language1 = EX.Python
 g.add((language1, RDF.type, EX.Language))
 g.add((library1, EX.requires, language1))
 
-# Limpiar solo las instancias de datos de ejemplo (no las definiciones)
+# Remove example data instances (keep schema definitions)
 g.remove((EX.TensorFlow, None, None))
 g.remove((EX.Version_2_1_0, None, None))
 g.remove((EX.Version_2_1_3, None, None))
@@ -177,12 +174,12 @@ g.remove((None, EX.changeModule, None))
 g.remove((None, EX.hasModule, None))
 g.remove((None, EX.requires, None))
 
-# Crear la librería TensorFlow y vincularla
+# Create the TensorFlow library and link it
 library_uri = EX.TensorFlow
 g.add((library_uri, RDF.type, EX.Library))
 g.add((library_uri, EX.libraryName, Literal("TensorFlow", datatype=XSD.string)))
 
-# Poblar el grafo con datos de releases parseadas
+# Populate graph with parsed release data
 from parse_release import parse_release
 import requests
 
@@ -194,6 +191,6 @@ parsed_releases = [parse_release(release) for release in data if '-rc' not in re
 for parsed_release in parsed_releases:
     populate_graph(parsed_release, g, library_uri)
 
-# Guardar la ontología en un archivo TTL
+# Save ontology to TTL file
 g.serialize(destination="/home/fabian/Documents/my_prj/phdtest/ontology.ttl", format="turtle")
-print("✓ Ontología guardada en ontology.ttl")
+print("✓ Ontology saved to ontology.ttl")

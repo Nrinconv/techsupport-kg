@@ -1,13 +1,19 @@
 import os
 from groq import Groq
 from rdflib import Graph
-
+import json
 
 MODEL = "llama-3.1-8b-instant"
 
-SYSTEM_PROMPT = """You must translate the user's request into a SPARQL query, and return only the query, no more information. . The graph is about libraries, their versions, modules, changes and programming languages
+SYSTEM_PROMPT = """
 
-Below is the graph schema being used in the project so you can successfully generate the queries, Do not invent any other class, relationship or attribute, only use the ones that are in the schema:
+You are an expert in SPARQL language and knowledge graphs.
+
+You must translate the user's request into a SPARQL query, and return only the query, no more information.
+
+The graph is about libraries, their versions, modules, changes and programming languages.
+
+Below is the graph schema being used in the project so you can successfully generate the queries, do not invent any other class, relationship or attribute, only use the ones that are in the schema:
 
 Classes:
 
@@ -171,16 +177,16 @@ def generate_sparql(question: str) -> str:
     return response.choices[0].message.content.strip()
 
 
-def agent(question: str, g: Graph) -> str:
+def agent(question: str, g: Graph) -> tuple[str, str]:
     query = generate_sparql(question)
-    print(f"Generated SPARQL query:\n{query}\n")
+    # print(f"Generated SPARQL query:\n{query}\n")
     for attempt in range(10):
         try:
             results = list(g.query(query))
             break
         except Exception as e:
             if attempt == 9:
-                return "Perdon, soy mongolo y despues de 10 intentos no logre generar la query SparQL para poder responder tu pregunta"
+                return query, "Sorry, I am dumb and after 10 attempts I failed to generate a valid SPARQL query to answer your question."
             query = reformulate(question, query, str(e))
 
     if len(results) == 0:
@@ -191,28 +197,94 @@ def agent(question: str, g: Graph) -> str:
                 break
             except Exception as e:
                 if attempt == 9:
-                    return "Perdon, soy mongolo y despues de 10 intentos no logre generar la query SparQL para poder responder tu pregunta"
+                    return query, "Sorry, I am dumb and after 10 attempts I failed to generate a valid SPARQL query to answer your question."
                 query = reformulate(question, query, str(e))
         if len(results) == 0:
-            return "No tengo información suficiente para responder esa pregunta."
+            return query, "I don't have enough information to answer that question."
 
-    return generate_answer(question, results)
+    return query, generate_answer(question, results)
+
+
+def llm_as_a_judge(question: str, expected: str, actual: str) -> dict:
+    prompt = (
+        f"You are an expert evaluator for question-answering systems over knowledge graphs. "
+        f"Your task is to judge whether the agent's answer is semantically equivalent to the expected answer, given the original question. "
+        f"Focus on whether the core meaning and factual content match, not on exact wording, formatting, or phrasing. "
+        f"Mark the answer as correct if the agent conveys the same information, even if expressed differently. "
+        f"Reply with a JSON object with two fields: "
+        f"\"correct\" (true or false) and \"justification\" (one sentence explaining your decision).\n\n"
+        f"User question: {question}\n"
+        f"Expected answer: {expected}\n"
+        f"Agent answer: {actual}"
+    )
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+    import json
+    return json.loads(response.choices[0].message.content)
+
+
+def evaluate(question: str, expected: str, actual: str, final_query: str, g: Graph) -> dict:
+    try:
+        g.query(final_query)
+        syntax_valid = True
+    except Exception:
+        syntax_valid = False
+
+    judge = llm_as_a_judge(question, expected, actual)
+
+    return {
+        "syntax_valid": syntax_valid,
+        "semantic_correct": judge.get("correct", False),
+        "justification": judge.get("justification", ""),
+    }
 
 
 if __name__ == "__main__":
-    questions = [
-        "¿Qué cambios hubo en la versión 2.19.0?",
-        "¿Qué módulos tuvieron features en TensorFlow?",
-        "¿Hay algún bugfix relacionado con save_model?",
-        "Dame todos los breaking changes con su fix si existe",
-    ]
+    # questions = [
+    #     "What changes were made in version 2.19.0?",
+    #     "Which modules had features in TensorFlow?",
+    #     "Is there any bugfix related to save_model?",
+    #     "Give me all breaking changes with their fix if it exists",
+    # ]
+    # for question in questions:
+    #     print(f"\n{'='*60}")
+    #     print(f"Question: {question}")
+    #     answer = agent(question, g)
+    #     print(f"Answer: {answer}")
 
     ttl_path = os.path.join(os.path.dirname(__file__), "ontology.ttl")
     g = Graph()
     g.parse(ttl_path, format="turtle")
 
-    for question in questions:
+    with open(os.path.join(os.path.dirname(__file__), "benchmark.json")) as f:
+        benchmark = json.load(f)
+
+    results_list = []
+    for item in benchmark:
+        question = item["question"]
+        expected = item["expected"]
+
+        query, answer = agent(question, g)
+        result = evaluate(question, expected, answer, query, g)
+        results_list.append(result)
+
         print(f"\n{'='*60}")
-        print(f"Pregunta: {question}")
-        answer = agent(question, g)
-        print(f"Respuesta: {answer}")
+        print(f"Question:    {question}")
+        print(f"Expected:    {expected}")
+        print(f"Answer:      {answer}")
+        print(f"Syntax OK:   {result['syntax_valid']}")
+        print(f"Semantic OK: {result['semantic_correct']}")
+        print(f"Justification: {result['justification']}")
+
+    syntax_score = sum(1 for r in results_list if r['syntax_valid'])
+    semantic_score = sum(1 for r in results_list if r['semantic_correct'])
+    total = len(benchmark)
+
+    print(f"\n{'='*60}")
+    print(f"SUMMARY: {syntax_score}/{total} valid queries | {semantic_score}/{total} correct answers")

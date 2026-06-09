@@ -1,0 +1,62 @@
+[
+    {
+        "question": "Is there any bugfix related to save_model?",
+        "expected": "Yes, in version 2.19.1 a bug was fixed related to save_model.save for Serving embedding."
+    },
+    {
+        "question": "What breaking changes were there in version 2.21.0?",
+        "expected": "Two breaking changes: support for Python 3.9 was removed and the TensorBoard dependency was dropped."
+    },
+    {
+        "question": "What breaking change was there in version 2.18.1?",
+        "expected": "tensorflow-tpu was skipped in that patch due to sparsecore-related bugs. Upgrading to 2.19.0 is recommended."
+    },
+    {
+        "question": "What features were added to tf.lite in version 2.21.0?",
+        "expected": "Support was added for int2, int4, uint4, int8, int16x8 across several operators (cast, slice, fully_connected, SQRT, EQUAL, NOT_EQUAL)."
+    },
+    {
+        "question": "In which versions were there changes to the tf.data module?",
+        "expected": "In versions 2.20.0 and 2.21.0."
+    },
+    {
+        "question": "What changes were made to tf.data in version 2.20.0?",
+        "expected": "autotune.min_parallelism was added to tf.data.Options to speed up input pipeline warm up."
+    },
+    {
+        "question": "Which modules had changes in version 2.21.0?",
+        "expected": "The modules tf.lite, tf.data and tf.image had changes in version 2.21.0."
+    },
+    {
+        "question": "Was there any change related to JPEG in TensorFlow?",
+        "expected": "Yes, in version 2.21.0 JPEG XL support was added to decode_image in the tf.image module."
+    },
+    {
+        "question": "In which version was tf.lite deprecated?",
+        "expected": "In version 2.20.0, tf.lite was marked as deprecated in favor of the new google-ai-edge LiteRT repository."
+    },
+    {
+        "question": "Was there any bugfix in version 2.21.0?",
+        "expected": "Yes, NoneTensorSpec was fixed in tf.data so that None appears in element_spec of the public API."
+    },
+    {
+        "question": "Does TensorFlow support Python 3.9 in version 2.21.0?",
+        "expected": "No, support for Python 3.9 was removed starting from TF 2.21."
+    },
+    {
+        "question": "What changes were made in version 2.19.0?",
+        "expected": "One feature in tf.lite: the tfl.Cast operator now supports bfloat16 in the runtime kernel."
+    },
+    {
+        "question": "Were there any changes related to PyTorch in TensorFlow?",
+        "expected": "No, there is no information about PyTorch-related changes in the graph."
+    },
+    {
+        "question": "Is there information about TensorFlow version 2.17.0?",
+        "expected": "No, the graph does not contain information about version 2.17.0."
+    },
+    {
+        "question": "Are there any changes to the tf.keras module in any version?",
+        "expected": "No, the graph does not contain information about changes to tf.keras."
+    }
+]

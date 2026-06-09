@@ -24,6 +24,6 @@ WHERE {
 """
 
 results = list(g.query(query))
-print(f"Resultados: {len(results)}")
+print(f"Results: {len(results)}")
 for row in results:
     print(row)
